@@ -7,7 +7,9 @@ import { variantById } from '../data/products';
 import { useExperience } from '../store/useExperience';
 import { qualitySettings, prefersReducedMotion } from '../hooks/useQuality';
 import { createLiquidMaterial } from './liquidMaterial';
-import { IDLE_SPIN, pose } from './pose';
+import { IDLE_SPIN, pose, pour } from './pose';
+import { Pour } from './Pour';
+import { expose } from '../debug';
 
 export const MODEL_URL = '/models/perfume.glb';
 
@@ -18,6 +20,9 @@ export const BOTTLE_HEIGHT = 1.38;
 /** Sections where the bottle holds still so it can be read (notes) or taken apart (deconstruct). */
 const STILL_SECTIONS = new Set(['notes', 'deconstruct']);
 const TAU = Math.PI * 2;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+/** Slosh spring: max surface tilt (slope), rocking frequency, and how fast it calms down. */
+const SLOSH = { max: 0.14, hz: 1.3, recovery: 1.1 };
 
 type PerfumeNodes = Record<'Glass' | 'GlassTint' | 'Liquid' | 'Collar' | 'Cord' | 'Seal', THREE.Mesh>;
 
@@ -71,11 +76,7 @@ export function Perfume() {
 
   const capGeometry = useMemo(createCapGeometry, []);
 
-  const liquid = useMemo(() => {
-    const geometry = nodes.Liquid.geometry;
-    if (!geometry.boundingBox) geometry.computeBoundingBox();
-    return createLiquidMaterial(geometry.boundingBox!);
-  }, [nodes]);
+  const liquid = useMemo(() => createLiquidMaterial(nodes.Liquid), [nodes]);
 
   const materials = useMemo(
     () => ({
@@ -116,7 +117,9 @@ export function Perfume() {
     g.needsUpdate = true;
   }, [materials, quality]);
 
-  // Variant change: half a turn, the new liquid rises from the bottom, metals and glass follow.
+  // Variant change = a refill. The bottle turns its back, the cap unscrews and steps aside, the old
+  // perfume drains, a stream of the new one falls through the neck and the level rises (rippling,
+  // bubbling), the stream runs dry, the surface settles and the cap screws back on. ~4 s.
   const firstVariant = useRef(true);
   const variantTl = useRef<gsap.core.Timeline | null>(null);
   useEffect(() => {
@@ -125,32 +128,43 @@ export function Perfume() {
 
     if (firstVariant.current) {
       firstVariant.current = false;
-      u.uFrom.value.set(c.liquid);
-      u.uTo.value.set(c.liquid);
+      u.uColor.value.set(c.liquid);
       materials.glass.attenuationColor.set(c.glassTint);
       materials.metal.color.set(c.metal);
       materials.cap.color.set(c.cap);
       return;
     }
 
-    // finishing the previous transition first keeps a rapid second click clean
+    // finishing the previous refill first keeps a quick second change clean
     variantTl.current?.progress(1).kill();
-    const reduced = prefersReducedMotion();
-    const d = reduced ? 0.3 : 1;
-    u.uTo.value.set(c.liquid);
-    u.uGlow.value.set(c.accent);
-
     const tl = gsap.timeline();
-    if (!reduced) tl.to(pose, { variantSpin: pose.variantSpin + Math.PI, duration: 1.4, ease: 'power3.inOut' }, 0);
-    tl.fromTo(u.uProgress, { value: 0 }, { value: 1, duration: 1.2 * d, ease: 'power2.inOut' }, reduced ? 0 : 0.15);
-    tweenColor(tl, materials.glass.attenuationColor, c.glassTint, 0.8 * d, 0.3 * d);
-    tweenColor(tl, materials.metal.color, c.metal, 0.8 * d, 0.3 * d);
-    tweenColor(tl, materials.cap.color, c.cap, 0.8 * d, 0.3 * d);
-    tl.call(() => {
-      u.uFrom.value.copy(u.uTo.value);
-      u.uProgress.value = 0;
-    });
+
+    if (prefersReducedMotion()) {
+      tl.call(() => void u.uColor.value.set(c.liquid));
+      tweenColor(tl, materials.glass.attenuationColor, c.glassTint, 0.3, 0);
+      tweenColor(tl, materials.metal.color, c.metal, 0.3, 0);
+      tweenColor(tl, materials.cap.color, c.cap, 0.3, 0);
+      variantTl.current = tl;
+      return;
+    }
+
+    tl.to(pose, { variantSpin: pose.variantSpin + Math.PI, duration: 1.4, ease: 'power3.inOut' }, 0);
+    tl.to(pour, { capAside: 1, duration: 0.9, ease: 'power2.inOut' }, 0.05);
+    tl.to(pour, { fill: 0, duration: 0.75, ease: 'power2.in' }, 0.1);
+    // the bottle is empty and facing away: the new perfume's color can be set unseen
+    tl.call(() => void u.uColor.value.set(c.liquid), undefined, 0.86);
+    tl.fromTo(pour, { head: 0, tail: 0 }, { head: 1, duration: 0.32, ease: 'power2.in', immediateRender: false }, 0.9);
+    tl.to(pour, { agitation: 1, duration: 0.25 }, 1.15);
+    tl.to(pour, { fill: 1, duration: 1.7, ease: 'sine.inOut' }, 1.2);
+    tl.to(pour, { tail: 1, duration: 0.32, ease: 'power2.in' }, 2.75);
+    tl.to(pour, { agitation: 0, duration: 1.3, ease: 'power2.out' }, 2.95);
+    tl.to(pour, { capAside: 0, duration: 1.1, ease: 'power2.inOut' }, 3.0);
+    tl.set(pour, { head: 0, tail: 0 }, 3.1);
+    tweenColor(tl, materials.glass.attenuationColor, c.glassTint, 1.2, 0.6);
+    tweenColor(tl, materials.metal.color, c.metal, 1.2, 0.6);
+    tweenColor(tl, materials.cap.color, c.cap, 1.2, 0.6);
     variantTl.current = tl;
+    expose('refill', tl);
   }, [variant, liquid, materials]);
 
   // Cap: unscrews (three turns) while rising, screws back down on close.
@@ -196,6 +210,18 @@ export function Perfume() {
   // Idle spin, applied on top of every animated value.
   const reduced = useMemo(prefersReducedMotion, []);
   const idle = useRef({ angle: 0, speed: reduced ? 0 : 1 });
+  const wobble = useRef({ ready: false, x: 0, y: 0, angle: 0, addX: 0, addZ: 0 });
+  const tmp = useMemo(
+    () => ({
+      qInv: new THREE.Quaternion(),
+      qSpin: new THREE.Quaternion(),
+      qTilt: new THREE.Quaternion(),
+      right: new THREE.Vector3(),
+      depth: new THREE.Vector3(),
+      pos: new THREE.Vector3(),
+    }),
+    [],
+  );
   useFrame(({ clock }, delta) => {
     if (!outer.current || !spin.current || !cap.current || !neck.current || !glass.current) return;
     const dt = Math.min(delta, 0.05);
@@ -215,9 +241,58 @@ export function Perfume() {
 
     spin.current.rotation.set(pose.noteTilt, i.angle + pose.scrollRot + pose.variantSpin + pose.noteRot, reduced ? 0 : Math.sin(t * 0.5) * 0.015);
 
-    cap.current.position.y = COLLAR_TOP + pose.capOpen * 0.22 + pose.lift * 0.42;
-    cap.current.rotation.y = -(pose.capOpen * 3 + pose.lift * 1.5) * Math.PI;
+    // bottle-space directions of the world's up, right and depth (the bottle spins; the world doesn't)
+    spin.current.updateWorldMatrix(true, false);
+    spin.current.getWorldQuaternion(tmp.qInv).invert();
+    const right = tmp.right.set(1, 0, 0).applyQuaternion(tmp.qInv);
+    const depth = tmp.depth.set(0, 0, 1).applyQuaternion(tmp.qInv);
+
+    // --- the cap: unscrews and rises (button / deconstruct); during a refill it also steps aside,
+    // always toward the viewer's right, tipping away from the neck ---
+    const aside = pour.capAside;
+    // lifted just clear of the neck and set down beside it, low enough to stay in frame
+    const capY = COLLAR_TOP + pose.capOpen * 0.22 + pose.lift * 0.42 + Math.sin(aside * Math.PI) * 0.12 + aside * 0.1;
+    cap.current.position.set(right.x * aside * 0.5, capY, right.z * aside * 0.5);
+    tmp.qSpin.setFromAxisAngle(Y_AXIS, -(pose.capOpen * 3 + pose.lift * 1.5 + aside * 2) * Math.PI);
+    tmp.qTilt.setFromAxisAngle(depth, -aside * 0.45);
+    cap.current.quaternion.multiplyQuaternions(tmp.qTilt, tmp.qSpin);
     neck.current.position.y = pose.lift * 0.2;
+
+    // --- liquid level and slosh ---
+    const u = liquid.uniforms;
+    const level = THREE.MathUtils.lerp(liquid.minY - 0.01, liquid.maxY - 0.004, pour.fill);
+    pour.level = level;
+    u.uLevel.value = level;
+    u.uAgitation.value = pour.agitation;
+    u.uTime.value = t;
+
+    // A damped spring fed by the bottle's movement (MinionsArt-style wobble): moving sideways or
+    // turning quickly tips the surface, which then rocks back and settles.
+    const w = wobble.current;
+    const pos = spin.current.getWorldPosition(tmp.pos);
+    const angle = spin.current.rotation.y;
+    if (w.ready && dt > 0) {
+      const vx = (pos.x - w.x) / dt;
+      const vy = (pos.y - w.y) / dt;
+      // a slow spin about its own axis doesn't stir a liquid; only fast turns (a variant change) do
+      const rawRate = (angle - w.angle) / dt;
+      const spinRate = Math.sign(rawRate) * Math.max(0, Math.abs(rawRate) - 0.8);
+      const k = dt * 60;
+      w.addX = THREE.MathUtils.lerp(w.addX, 0, dt * SLOSH.recovery);
+      w.addZ = THREE.MathUtils.lerp(w.addZ, 0, dt * SLOSH.recovery);
+      w.addX = THREE.MathUtils.clamp(w.addX + (-vx * 0.02 + spinRate * 0.004) * k, -SLOSH.max, SLOSH.max);
+      w.addZ = THREE.MathUtils.clamp(w.addZ + (vy * 0.01 + spinRate * 0.003) * k, -SLOSH.max, SLOSH.max);
+      // a pouring stream keeps stirring the surface
+      w.addX += Math.sin(t * 7.3) * 0.0025 * pour.agitation * k;
+      w.addZ += Math.cos(t * 6.1) * 0.0025 * pour.agitation * k;
+    }
+    w.ready = true;
+    w.x = pos.x;
+    w.y = pos.y;
+    w.angle = angle;
+    const pulse = TAU * SLOSH.hz * t;
+    const worldNormal = u.uPlaneNormalWorld.value.set(w.addX * Math.sin(pulse), 1, w.addZ * Math.sin(pulse + 0.9)).normalize();
+    u.uPlaneNormal.value.copy(worldNormal).applyQuaternion(tmp.qInv);
     // the glass slides left, away from the labels on the right
     glass.current.position.x = -pose.split;
 
@@ -226,8 +301,6 @@ export function Perfume() {
       shadow.current.material.opacity = 0.55 * pose.intro * pose.intro;
       shadow.current.position.y = -rise + 0.002;
     }
-
-    liquid.uniforms.uTime.value = t;
   });
 
   return (
@@ -236,6 +309,7 @@ export function Perfume() {
       <Shadow ref={shadow} position={[0, 0.002, 0]} scale={[1.1, 0.55, 1]} color="#000000" opacity={0.55} colorStop={0} fog={false} />
       <group ref={spin}>
         <mesh {...part(nodes.Liquid)} material={materials.liquid} renderOrder={1} />
+        <Pour color={liquid.uniforms.uColor.value} />
         <group ref={glass}>
           <mesh {...part(nodes.Glass)} material={materials.glass} renderOrder={2} />
         </group>
