@@ -1,18 +1,44 @@
-import { useEffect } from 'react';
-import { layerLabel, variantById, variants } from '../data/products';
+import { Fragment, useEffect, useLayoutEffect, type CSSProperties } from 'react';
+import { layerLabel, variantById, variants, type VariantId } from '../data/products';
 import { useExperience } from '../store/useExperience';
-import { scrollToSection } from '../animation/scroll';
+import { scrollToSection, ScrollTrigger } from '../animation/scroll';
+
+/** Splits text into spans so CSS can stagger them; the real text stays readable to screen readers. */
+function Split({ text, by }: { text: string; by: 'char' | 'word' }) {
+  const parts = by === 'char' ? Array.from(text) : text.split(' ');
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span className="split" aria-hidden="true">
+        {parts.map((part, i) => (
+          <Fragment key={i}>
+            <span className="split__mask">
+              <span className="split__item" style={{ '--i': i } as CSSProperties}>
+                {part}
+              </span>
+            </span>
+            {/* outside the inline-block mask, or the space collapses */}
+            {by === 'word' && i < parts.length - 1 ? ' ' : null}
+          </Fragment>
+        ))}
+      </span>
+    </>
+  );
+}
 
 export function Intro() {
   return (
     <section id="intro" className="section section--intro" data-section="intro">
       <div className="intro__title">
-        <p className="eyebrow">Maison ÉTHER</p>
-        <h1 className="display">ÉTHER</h1>
-        <p className="lede">The Architecture of Scent</p>
+        <p className="eyebrow intro__eyebrow">Maison ÉTHER</p>
+        <h1 className="display intro__name">
+          <Split text="ÉTHER" by="char" />
+        </h1>
+        <p className="lede intro__lede">The Architecture of Scent</p>
       </div>
       <button className="scroll-cue" type="button" onClick={() => scrollToSection('manifesto')}>
         Scroll to discover
+        <span className="scroll-cue__line" aria-hidden="true" />
       </button>
     </section>
   );
@@ -21,36 +47,46 @@ export function Intro() {
 export function Manifesto() {
   return (
     <section id="manifesto" className="section section--manifesto" data-section="manifesto">
-      <div className="manifesto__line">
-        <h2 className="headline">A fragrance cannot be seen.</h2>
+      <div className="manifesto__line" data-reveal>
+        <h2 className="headline">
+          <Split text="A fragrance cannot be seen." by="word" />
+        </h2>
       </div>
-      <div className="manifesto__line">
-        <h2 className="headline">So we built it in layers.</h2>
+      <div className="manifesto__line" data-reveal>
+        <h2 className="headline">
+          <Split text="So we built it in layers." by="word" />
+        </h2>
       </div>
     </section>
   );
 }
 
 export function Collection() {
-  const current = useExperience((s) => s.variant);
   const setVariant = useExperience((s) => s.setVariant);
+
+  // Scrolling through the collection changes the variant: the panel at the middle of the screen wins.
+  useLayoutEffect(() => {
+    const triggers = Array.from(document.querySelectorAll<HTMLElement>('.collection__panel')).map((panel) =>
+      ScrollTrigger.create({
+        trigger: panel,
+        start: 'top center',
+        end: 'bottom center',
+        onToggle: (self) => self.isActive && setVariant(panel.dataset.variant as VariantId),
+      }),
+    );
+    return () => triggers.forEach((t) => t.kill());
+  }, [setVariant]);
 
   return (
     <section id="collection" className="section section--collection" data-section="collection">
       {variants.map((v) => (
-        <article key={v.id} className="collection__panel" data-variant={v.id} aria-labelledby={`variant-${v.id}`}>
+        <article key={v.id} className="collection__panel" data-variant={v.id} data-reveal aria-labelledby={`variant-${v.id}`}>
           <p className="eyebrow">{v.index} / 03</p>
-          <h2 id={`variant-${v.id}`} className="display display--md">{v.name}</h2>
-          <p className="lede">{v.tagline}</p>
-          <p className="body">{v.description}</p>
-          <button
-            type="button"
-            className="pill"
-            aria-pressed={current === v.id}
-            onClick={() => setVariant(v.id)}
-          >
-            {current === v.id ? 'Selected' : `Choose ${v.name}`}
-          </button>
+          <h2 id={`variant-${v.id}`} className="display display--md">
+            <Split text={v.name} by="char" />
+          </h2>
+          <p className="lede reveal-fade">{v.tagline}</p>
+          <p className="body reveal-fade">{v.description}</p>
         </article>
       ))}
     </section>
@@ -88,12 +124,13 @@ export function Notes() {
       </ul>
       <div className="note-panel" aria-live="polite">
         {note && (
-          <>
+          // keyed so the entrance animation replays for every note
+          <div key={note.id} className="note-panel__inner">
             <p className="eyebrow">{layerLabel[note.layer]}</p>
             <h3 className="headline headline--sm">{note.name}</h3>
             <p className="note-panel__adjectives">{note.adjectives.join(' · ')}</p>
             <p className="body">{note.line}</p>
-          </>
+          </div>
         )}
       </div>
     </section>
@@ -113,7 +150,7 @@ export function Deconstruct() {
       <h2 className="headline deconstruct__title">Built in layers.</h2>
       <ol className="deconstruct__layers">
         {layers.map((l) => (
-          <li key={l.id} className="deconstruct__layer" data-layer={l.id}>
+          <li key={l.id} className="deconstruct__layer" data-layer={l.id} data-reveal>
             <p className="eyebrow">{l.title}</p>
             <p className="body">{l.detail}</p>
           </li>
@@ -129,7 +166,9 @@ export function Final() {
 
   return (
     <section id="final" className="section section--final" data-section="final">
-      <h2 className="display display--md">Define your presence.</h2>
+      <h2 className="display display--md" data-reveal>
+        <Split text="Define your presence." by="word" />
+      </h2>
       <div className="final__picker" role="group" aria-label="Choose a fragrance">
         {variants.map((v) => (
           <button key={v.id} type="button" className="pill" aria-pressed={current === v.id} onClick={() => setVariant(v.id)}>

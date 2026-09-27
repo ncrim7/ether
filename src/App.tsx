@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect } from 'react';
 import { Scene } from './scene/Scene';
 import { Loader } from './Loader';
+import { CapButton } from './CapButton';
 import { Intro, Manifesto, Collection, Notes, Deconstruct, Final } from './sections/Sections';
 import { setupScroll, ScrollTrigger } from './animation/scroll';
+import { buildChoreography } from './animation/choreography';
 import { useQuality } from './hooks/useQuality';
 import { variantById } from './data/products';
 import { useExperience, type SectionId } from './store/useExperience';
@@ -10,6 +12,7 @@ import { useExperience, type SectionId } from './store/useExperience';
 export default function App() {
   useQuality();
   const variant = variantById(useExperience((s) => s.variant));
+  const loaded = useExperience((s) => s.loaded);
   const setSection = useExperience((s) => s.setSection);
 
   useEffect(() => setupScroll(), []);
@@ -27,6 +30,42 @@ export default function App() {
     return () => triggers.forEach((t) => t.kill());
   }, [setSection]);
 
+  // Copy marked data-reveal animates in (CSS) while it is on screen, and out again when it leaves.
+  useLayoutEffect(() => {
+    const triggers = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]')).map((el) =>
+      ScrollTrigger.create({ trigger: el, start: 'top 70%', end: 'bottom 30%', toggleClass: 'is-in' }),
+    );
+    return () => triggers.forEach((t) => t.kill());
+  }, []);
+
+  // The scroll timeline measures the layout, so it is rebuilt when the layout changes.
+  useLayoutEffect(() => {
+    let cleanup = buildChoreography();
+    let timer = 0;
+    let width = window.innerWidth;
+    const onResize = () => {
+      // mobile address bars resize the height while scrolling; only a new width changes the layout
+      if (window.innerWidth === width) return;
+      width = window.innerWidth;
+      rebuild();
+    };
+    const rebuild = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        cleanup();
+        ScrollTrigger.refresh();
+        cleanup = buildChoreography();
+      }, 200);
+    };
+    window.addEventListener('resize', onResize);
+    document.fonts?.ready.then(rebuild);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+      cleanup();
+    };
+  }, []);
+
   // Variant colors drive the HTML layer through CSS variables.
   useEffect(() => {
     const root = document.documentElement.style;
@@ -36,6 +75,11 @@ export default function App() {
     document.documentElement.dataset.tone = variant.tone;
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', variant.colors.background);
   }, [variant]);
+
+  // Starts the CSS intro once the loader is gone.
+  useEffect(() => {
+    document.documentElement.dataset.ready = String(loaded);
+  }, [loaded]);
 
   return (
     <>
@@ -49,6 +93,7 @@ export default function App() {
         <Deconstruct />
         <Final />
       </main>
+      <CapButton />
     </>
   );
 }

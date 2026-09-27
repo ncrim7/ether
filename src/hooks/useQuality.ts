@@ -1,8 +1,16 @@
 import { useEffect } from 'react';
 import { useExperience, type Quality } from '../store/useExperience';
 
+/** `?quality=high|medium|low` pins the tier (and turns off automatic step-down) for testing. */
+export function forcedQuality(): Quality | null {
+  const q = new URLSearchParams(window.location.search).get('quality');
+  return q === 'high' || q === 'medium' || q === 'low' ? q : null;
+}
+
 // Initial guess only; drei's PerformanceMonitor can step it down at runtime.
 export function detectQuality(): Quality {
+  const forced = forcedQuality();
+  if (forced) return forced;
   const nav = navigator as Navigator & { deviceMemory?: number };
   const coarse = window.matchMedia('(pointer: coarse)').matches;
   const cores = nav.hardwareConcurrency ?? 4;

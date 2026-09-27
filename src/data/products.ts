@@ -65,7 +65,7 @@ export const variants: Variant[] = [
       backgroundDeep: '#050307',
       accent: '#b58cff',
       text: '#f1ebfa',
-      liquid: '#3b1a5c',
+      liquid: '#4a2275',
       glassTint: '#2a1f35',
       metal: '#3a3740',
       cap: '#111014',
