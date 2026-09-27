@@ -147,9 +147,14 @@ export function Backdrop() {
 
   useEffect(() => () => material.dispose(), [material]);
 
-  // Variant colors glide over, in step with the refill.
+  // Variant colors glide over, in step with the refill. Only the very first run is skipped (the
+  // uniforms already hold the first variant) — returning to that variant later must still tween.
+  const mounted = useRef(false);
   useEffect(() => {
-    if (variant === first.current) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     const d = prefersReducedMotion() ? 0.3 : 1.2;
     const tl = gsap.timeline({ defaults: { duration: d, ease: 'power2.inOut' } });
     const to = (color: THREE.Color, hex: string) => {

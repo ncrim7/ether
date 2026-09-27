@@ -6,6 +6,27 @@
 
 import { chromium } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { inflateSync } from 'node:zlib';
+
+/**
+ * Brightness (0-255) of one pixel near the top-left corner, where only the backdrop shows.
+ * Reads a 1x1 PNG screenshot; with a single pixel every PNG row filter leaves the bytes as they are.
+ */
+async function cornerLuma(page) {
+  const png = await page.screenshot({ clip: { x: 12, y: 12, width: 1, height: 1 } });
+  const idat = [];
+  let colorType = 2;
+  for (let i = 8; i < png.length; ) {
+    const len = png.readUInt32BE(i);
+    const type = png.toString('ascii', i + 4, i + 8);
+    if (type === 'IHDR') colorType = png[i + 8 + 9];
+    if (type === 'IDAT') idat.push(png.subarray(i + 8, i + 8 + len));
+    i += len + 12;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const [r, g, b] = colorType === 2 || colorType === 6 ? [raw[1], raw[2], raw[3]] : [raw[1], raw[1], raw[1]];
+  return Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+}
 
 const url = process.argv[2] ?? 'http://localhost:4173';
 const outDir = 'screenshots';
@@ -97,11 +118,19 @@ for (const vp of viewports) {
   await page.waitForTimeout(2000);
   await shot('6-final-cap-closed');
 
-  // the final picker still works by click
+  // the final picker still works by click, and the WebGL backdrop (not just the CSS) follows it —
+  // including back to NOIR, the first variant
   await page.locator('.final__picker .pill', { hasText: 'AURA' }).click();
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(3000);
   if ((await bg()) !== backgrounds.aura) fail(vp, 'final picker did not switch to AURA');
+  const light = await cornerLuma(page);
+  if (light < 150) fail(vp, `backdrop stayed dark after AURA (luma ${light})`);
   await shot('6-final-aura');
+  await page.locator('.final__picker .pill', { hasText: 'NOIR' }).click();
+  await page.waitForTimeout(3000);
+  const dark = await cornerLuma(page);
+  if (dark > 40) fail(vp, `backdrop stayed light after returning to NOIR (luma ${dark})`);
+  await shot('6-final-noir-again');
 
   await page.close();
 }
