@@ -6,6 +6,8 @@ import { forcedQuality, qualitySettings } from '../hooks/useQuality';
 import { Perfume } from './Perfume';
 import { Lights } from './Lights';
 import { CameraRig } from './CameraRig';
+import { Backdrop } from './Backdrop';
+import { Particles } from './Particles';
 
 const stepDown = { high: 'medium', medium: 'low', low: 'low' } as const;
 
@@ -34,6 +36,8 @@ export function Scene() {
         {!forcedQuality() && <PerformanceMonitor onDecline={() => setQuality(stepDown[quality])} />}
         <QualitySync />
         <CameraRig />
+        <Backdrop />
+        <Particles />
         <Lights />
         <Suspense fallback={null}>
           <Perfume />

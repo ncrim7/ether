@@ -10,7 +10,9 @@ import { createRequire } from 'node:module';
 const url = process.argv[2] ?? 'http://localhost:4173';
 const target = process.argv[3] ?? 'AURA';
 const outDir = 'screenshots/refill';
-const times = [0, 0.4, 0.8, 1.1, 1.4, 1.8, 2.2, 2.6, 3.0, 3.4, 3.8, 4.4];
+const times = process.argv[4] === 'full'
+  ? [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.2, 1.5, 1.8, 2.1, 2.4]
+  : [0, 0.4, 0.8, 1.1, 1.4, 1.8, 2.2, 2.6, 3.0, 3.4, 3.8, 4.4];
 
 await mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -32,8 +34,10 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(5000);
 
-// the bottle sits in the right half of the final section
-const clip = { x: 440, y: 0, width: 500, height: 720 };
+// the bottle sits in the right half of the final section; a 4th argument "full" keeps the whole
+// frame (to see the backdrop's ring)
+const full = process.argv[4] === 'full';
+const clip = full ? undefined : { x: 440, y: 0, width: 500, height: 720 };
 // Software rendering takes seconds per frame, so the refill timeline is frozen and scrubbed to
 // each moment instead of filmed in real time.
 log('scrolled to final');
@@ -68,7 +72,7 @@ await browser.close();
 const ffmpeg = createRequire(import.meta.url)('ffmpeg-static');
 execFileSync(ffmpeg, [
   '-y', '-loglevel', 'error', '-i', `${outDir}/f%02d.png`,
-  '-vf', 'scale=350:-1,tile=6x2', '-frames:v', '1', 'screenshots/refill-sheet.jpg',
+  '-vf', `scale=${full ? 480 : 350}:-1,tile=6x2`, '-frames:v', '1', 'screenshots/refill-sheet.jpg',
 ]);
 console.log('wrote screenshots/refill-sheet.jpg');
 if (errors.length) {

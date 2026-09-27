@@ -11,7 +11,10 @@ interface ExperienceState {
   quality: Quality;
   loaded: boolean;
   capOpen: boolean;
+  /** the variant printed on the bottle; lags `variant` until the refill turns the bottle around */
+  printed: VariantId;
   setVariant: (variant: VariantId) => void;
+  setPrinted: (variant: VariantId) => void;
   toggleCap: () => void;
   toggleNote: (note: string) => void;
   clearNote: () => void;
@@ -27,6 +30,8 @@ export const useExperience = create<ExperienceState>((set) => ({
   quality: 'high',
   loaded: false,
   capOpen: false,
+  printed: 'noir',
+  setPrinted: (printed) => set({ printed }),
   toggleCap: () => set((s) => ({ capOpen: !s.capOpen })),
   // notes differ per variant, so a variant change always closes the open note
   setVariant: (variant) => set((s) => (s.variant === variant ? s : { variant, activeNote: null })),

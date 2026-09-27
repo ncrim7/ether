@@ -198,15 +198,25 @@ body::after {
 
 .section--intro {
   display: grid;
-  place-items: center;
   height: 100svh;
   text-align: center;
 }
 
+/* the name above the bottle, the line beneath it, the bottle framed between */
 .intro__title {
   display: grid;
+  grid-template-rows: auto auto 1fr auto;
   gap: 12px;
   justify-items: center;
+  padding: 7svh 0 13svh;
+}
+
+.intro__name {
+  font-size: clamp(64px, 9vw, 150px);
+}
+
+.intro__lede {
+  grid-row: 4;
 }
 
 .scroll-cue {
@@ -639,6 +649,15 @@ html[data-ready='true'] .cap-button[data-hidden='true'] {
   .section--intro {
     align-content: end;
     padding-bottom: 20svh;
+  }
+
+  .intro__title {
+    grid-template-rows: none;
+    padding: 0;
+  }
+
+  .intro__lede {
+    grid-row: auto;
   }
 
   .collection__panel,

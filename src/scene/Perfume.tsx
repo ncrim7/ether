@@ -7,8 +7,9 @@ import { variantById } from '../data/products';
 import { useExperience } from '../store/useExperience';
 import { qualitySettings, prefersReducedMotion } from '../hooks/useQuality';
 import { createLiquidMaterial } from './liquidMaterial';
-import { IDLE_SPIN, pose, pour } from './pose';
+import { fx, IDLE_SPIN, pose, pour } from './pose';
 import { Pour } from './Pour';
+import { Label } from './Label';
 import { expose } from '../debug';
 
 export const MODEL_URL = '/models/perfume.glb';
@@ -139,8 +140,12 @@ export function Perfume() {
     variantTl.current?.progress(1).kill();
     const tl = gsap.timeline();
 
+    const setPrinted = useExperience.getState().setPrinted;
     if (prefersReducedMotion()) {
-      tl.call(() => void u.uColor.value.set(c.liquid));
+      tl.call(() => {
+        u.uColor.value.set(c.liquid);
+        setPrinted(variant.id);
+      });
       tweenColor(tl, materials.glass.attenuationColor, c.glassTint, 0.3, 0);
       tweenColor(tl, materials.metal.color, c.metal, 0.3, 0);
       tweenColor(tl, materials.cap.color, c.cap, 0.3, 0);
@@ -149,9 +154,14 @@ export function Perfume() {
     }
 
     tl.to(pose, { variantSpin: pose.variantSpin + Math.PI, duration: 1.4, ease: 'power3.inOut' }, 0);
+    // a ring of the new accent sweeps out across the backdrop
+    tl.fromTo(fx, { ring: 0 }, { ring: 1, duration: 2.4, ease: 'power2.out', immediateRender: false }, 0);
+    tl.set(fx, { ring: 0 }, 2.4);
     tl.to(pour, { capAside: 1, duration: 0.9, ease: 'power2.inOut' }, 0.05);
     tl.to(pour, { fill: 0, duration: 0.75, ease: 'power2.in' }, 0.1);
     // the bottle is empty and facing away: the new perfume's color can be set unseen
+    // the printed side faces away from ~0.5 s to ~1.2 s: reprint the label then
+    tl.call(() => setPrinted(variant.id), undefined, 0.7);
     tl.call(() => void u.uColor.value.set(c.liquid), undefined, 0.86);
     tl.fromTo(pour, { head: 0, tail: 0 }, { head: 1, duration: 0.32, ease: 'power2.in', immediateRender: false }, 0.9);
     tl.to(pour, { agitation: 1, duration: 0.25 }, 1.15);
@@ -189,6 +199,17 @@ export function Perfume() {
     });
     return () => void tween.kill();
   }, [activeNote, variant]);
+
+  // Notes section: the bottle turns its back so the composition label faces the viewer.
+  const section = useExperience((s) => s.section);
+  useEffect(() => {
+    const tween = gsap.to(fx, {
+      backTurn: section === 'notes' ? Math.PI : 0,
+      duration: prefersReducedMotion() ? 0.2 : 1.4,
+      ease: 'power3.inOut',
+    });
+    return () => void tween.kill();
+  }, [section]);
 
   // Intro: the bottle rises out of the dark once the loader has finished.
   useEffect(() => {
@@ -239,7 +260,7 @@ export function Perfume() {
     outer.current.position.set(pose.x, -BOTTLE_HEIGHT / 2 + pose.y + rise + breath, 0);
     outer.current.scale.setScalar(pose.scale * pose.noteZoom * (0.9 + 0.1 * pose.intro));
 
-    spin.current.rotation.set(pose.noteTilt, i.angle + pose.scrollRot + pose.variantSpin + pose.noteRot, reduced ? 0 : Math.sin(t * 0.5) * 0.015);
+    spin.current.rotation.set(pose.noteTilt, i.angle + pose.scrollRot + pose.variantSpin + pose.noteRot + fx.backTurn, reduced ? 0 : Math.sin(t * 0.5) * 0.015);
 
     // bottle-space directions of the world's up, right and depth (the bottle spins; the world doesn't)
     spin.current.updateWorldMatrix(true, false);
@@ -312,6 +333,7 @@ export function Perfume() {
         <Pour color={liquid.uniforms.uColor.value} />
         <group ref={glass}>
           <mesh {...part(nodes.Glass)} material={materials.glass} renderOrder={2} />
+          <Label />
         </group>
         <group ref={neck}>
           <mesh {...part(nodes.Collar)} material={materials.metal} />

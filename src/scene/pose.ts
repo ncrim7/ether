@@ -49,6 +49,14 @@ export const pour = {
   level: 0,
 };
 
+/** Scene effects driven by timelines. */
+export const fx = {
+  /** 0..1 the backdrop's ring sweeping outward on a variant change */
+  ring: 0,
+  /** radians: in the notes section the bottle turns its back (the composition label) to the viewer */
+  backTurn: 0,
+};
+
 /** Where the stream starts: above the top of the frame, in bottle units. */
 export const STREAM_TOP = 2.8;
 

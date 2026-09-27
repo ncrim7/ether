@@ -41,7 +41,8 @@ function anchors(): Anchor[] {
   const threeQuarter = TURN - 0.55;
 
   return [
-    { at: 0, pose: p({}) },
+    // intro (wide): a little smaller and lower, between the name above and the line below
+    { at: 0, pose: p(narrow ? {} : { scale: s * 0.72, y: 0.07 }) },
     // manifesto: copy on the left
     { at: top(manifesto), pose: p({ x: side, scale: s * 1.05, scrollRot: 1 }) },
     { at: top(manifesto) + vh, pose: p({ x: side, scale: s * 1.05, scrollRot: 2.2 }) },

@@ -48,6 +48,11 @@ export interface Variant {
     count: { high: number; low: number };
     /** particle drift direction and speed, units per second */
     drift: [number, number, number];
+    /** point size multiplier */
+    size: number;
+    /** 0 = steady, 1 = embers flickering like sparks */
+    flicker: number;
+    opacity: number;
   };
   notes: Note[];
 }
@@ -71,7 +76,8 @@ export const variants: Variant[] = [
       cap: '#111014',
     },
     lights: { key: '#e9dcff', rim: '#9a6bff', intensity: 1 },
-    atmosphere: { particleColor: '#b58cff', count: { high: 1500, low: 400 }, drift: [0.01, 0.02, 0] },
+    // slow violet dust hanging in the dark
+    atmosphere: { particleColor: '#b58cff', count: { high: 1500, low: 400 }, drift: [0.02, 0.015, 0], size: 1, flicker: 0.15, opacity: 0.55 },
     notes: [
       {
         id: 'bergamot',
@@ -129,7 +135,8 @@ export const variants: Variant[] = [
       cap: '#e9eef0',
     },
     lights: { key: '#ffffff', rim: '#7fd8e6', intensity: 1.2 },
-    atmosphere: { particleColor: '#ffffff', count: { high: 1000, low: 300 }, drift: [0, 0.05, 0] },
+    // luminous motes rising through clean air (drawn darker than the pale background)
+    atmosphere: { particleColor: '#5fb3c0', count: { high: 1000, low: 300 }, drift: [0, 0.07, 0], size: 1.2, flicker: 0, opacity: 0.45 },
     notes: [
       {
         id: 'bergamot',
@@ -187,7 +194,8 @@ export const variants: Variant[] = [
       cap: '#15100e',
     },
     lights: { key: '#ffd9bf', rim: '#ff6a1f', intensity: 1.1 },
-    atmosphere: { particleColor: '#ff8a3d', count: { high: 800, low: 250 }, drift: [0, 0.25, 0] },
+    // sparks rising from a fire below the frame
+    atmosphere: { particleColor: '#ff8a3d', count: { high: 900, low: 250 }, drift: [0.03, 0.32, 0], size: 0.9, flicker: 1, opacity: 0.9 },
     notes: [
       {
         id: 'saffron',
