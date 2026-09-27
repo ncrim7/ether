@@ -1,0 +1,13 @@
+node_modules
+dist
+*.local
+.vite
+
+# raw reference material, kept out of the repo
+models-raw/
+*.mp4
+
+# test output
+test-results/
+playwright-report/
+screenshots/
