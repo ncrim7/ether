@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0b0810"/>
+  <!-- a bottle: cap, neck, body -->
+  <rect x="26" y="10" width="12" height="9" rx="2" fill="#b58cff"/>
+  <rect x="28.5" y="19" width="7" height="5" fill="#6d4fa3"/>
+  <rect x="16" y="24" width="32" height="30" rx="4" fill="#3b1a5c" stroke="#b58cff" stroke-width="2"/>
+  <rect x="24" y="34" width="16" height="1.5" fill="#f1ebfa" opacity="0.8"/>
+  <rect x="21" y="39" width="22" height="3" fill="#f1ebfa" opacity="0.9"/>
+</svg>

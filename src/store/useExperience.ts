@@ -13,6 +13,9 @@ interface ExperienceState {
   capOpen: boolean;
   /** the variant printed on the bottle; lags `variant` until the refill turns the bottle around */
   printed: VariantId;
+  /** 0..100 3D assets loaded, reported by the (lazily loaded) scene */
+  loadProgress: number;
+  setLoadProgress: (progress: number) => void;
   setVariant: (variant: VariantId) => void;
   setPrinted: (variant: VariantId) => void;
   toggleCap: () => void;
@@ -31,6 +34,8 @@ export const useExperience = create<ExperienceState>((set) => ({
   loaded: false,
   capOpen: false,
   printed: 'noir',
+  loadProgress: 0,
+  setLoadProgress: (loadProgress) => set({ loadProgress }),
   setPrinted: (printed) => set({ printed }),
   toggleCap: () => set((s) => ({ capOpen: !s.capOpen })),
   // notes differ per variant, so a variant change always closes the open note

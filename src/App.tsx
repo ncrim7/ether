@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect } from 'react';
-import { Scene } from './scene/Scene';
+import { lazy, Suspense, useEffect, useLayoutEffect } from 'react';
+import { hasWebGL } from './webgl';
 import { Loader } from './Loader';
 import { CapButton } from './CapButton';
 import { Intro, Manifesto, Collection, Notes, Deconstruct, Final } from './sections/Sections';
@@ -8,6 +8,9 @@ import { buildChoreography } from './animation/choreography';
 import { useQuality } from './hooks/useQuality';
 import { variantById } from './data/products';
 import { useExperience, type SectionId } from './store/useExperience';
+
+// three.js, R3F and drei load as their own chunk, so the page and loader paint first
+const Scene = lazy(() => import('./scene/Scene'));
 
 export default function App() {
   useQuality();
@@ -81,9 +84,19 @@ export default function App() {
     document.documentElement.dataset.ready = String(loaded);
   }, [loaded]);
 
+  // Without WebGL the copy, colors and transitions still work; CSS draws a halo in place of the bottle.
+  const webgl = hasWebGL();
+  useEffect(() => {
+    document.documentElement.dataset.webgl = String(webgl);
+  }, [webgl]);
+
   return (
     <>
-      <Scene />
+      {webgl && (
+        <Suspense fallback={null}>
+          <Scene />
+        </Suspense>
+      )}
       <Loader />
       <main className="content">
         <Intro />

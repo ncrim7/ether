@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { useProgress } from '@react-three/drei';
 import { useExperience } from './store/useExperience';
 import { prefersReducedMotion } from './hooks/useQuality';
+import { hasWebGL } from './webgl';
 
 /** How long the loader waits before giving up on WebGL assets and showing the page anyway. */
 const TIMEOUT_MS = 10_000;
@@ -9,13 +9,14 @@ const TIMEOUT_MS = 10_000;
 const MIN_COUNT_MS = 2200;
 
 export function Loader() {
-  const { progress, active } = useProgress();
+  // reported by the 3D scene, which loads as a separate chunk; without WebGL there is nothing to wait for
+  const progress = useExperience((s) => s.loadProgress);
   const loaded = useExperience((s) => s.loaded);
   const setLoaded = useExperience((s) => s.setLoaded);
   const [shown, setShown] = useState(0);
   const [timedOut, setTimedOut] = useState(false);
   const real = useRef(0);
-  real.current = !active && progress === 100 ? 100 : Math.min(progress, 99);
+  real.current = hasWebGL() ? progress : 100;
 
   useEffect(() => {
     const id = window.setTimeout(() => setTimedOut(true), TIMEOUT_MS);

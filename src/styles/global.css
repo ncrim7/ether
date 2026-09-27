@@ -109,6 +109,19 @@ body::after {
   z-index: 1;
 }
 
+/* no WebGL: a soft halo of the variant's accent stands in for the bottle, and the cap button goes */
+html[data-webgl='false'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(40vmax 40vmax at 50% 45%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 70%);
+  transition: background 0.8s var(--ease);
+}
+
+html[data-webgl='false'] .cap-button {
+  display: none;
+}
+
 /* ---------- type ---------- */
 .eyebrow {
   font-size: 11px;
